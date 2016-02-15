@@ -60,8 +60,8 @@ class KNearestNeighbor(object):
       is the Euclidean distance between the ith test point and the jth training
       point.
     """
-    num_test = X.shape[0]
-    num_train = self.X_train.shape[0]
+    num_test = X.shape[0]    # the number is the fist dimension
+    num_train = self.X_train.shape[0]    
     dists = np.zeros((num_test, num_train))
     for i in xrange(num_test):
       for j in xrange(num_train):
@@ -71,7 +71,7 @@ class KNearestNeighbor(object):
         # training point, and store the result in dists[i, j]. You should   #
         # not use a loop over dimension.                                    #
         #####################################################################
-        pass
+        dists[i, j] = np.linalg.norm(X[i]-self.X_train[j], 2)
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
@@ -93,7 +93,7 @@ class KNearestNeighbor(object):
       # Compute the l2 distance between the ith test point and all training #
       # points, and store the result in dists[i, :].                        #
       #######################################################################
-      pass
+      dists[i] = np.linalg.norm(X[i]-self.X_train, axis=1)
       #######################################################################
       #                         END OF YOUR CODE                            #
       #######################################################################
@@ -108,7 +108,7 @@ class KNearestNeighbor(object):
     """
     num_test = X.shape[0]
     num_train = self.X_train.shape[0]
-    dists = np.zeros((num_test, num_train)) 
+    dists = np.zeros((num_test, num_train))
     #########################################################################
     # TODO:                                                                 #
     # Compute the l2 distance between all test points and all training      #
@@ -121,10 +121,21 @@ class KNearestNeighbor(object):
     # HINT: Try to formulate the l2 distance using matrix multiplication    #
     #       and two broadcast sums.                                         #
     #########################################################################
-    pass
+    # in my computer, it occurs memory error
+    # if you try a smaller test number and train number, the result can be valided.
+    # dists = X.reshape(num_test, 1, -1) - self.X_train
+    # dists = np.sqrt(np.sum(dists*dists, axis=2));
+    # finally, I found this answer in Github: 
+    # https://github.com/dengfy/cs231n/blob/master/assignment1/cs231n/classifiers/k_nearest_neighbor.py
+    # norm(a-b) = (a-b)(a-b)T = aaT+bbT-2*abT
+
+    test_square = np.array([np.sum(np.square(X), axis = 1)] * num_train).transpose()
+    train_square = np.array([np.sum(np.square(self.X_train), axis = 1)] * num_test)
+    dists = np.sqrt(X.dot(self.X_train.transpose()) * (-2) + test_square + train_square)    
     #########################################################################
     #                         END OF YOUR CODE                              #
     #########################################################################
+    # return dists
     return dists
 
   def predict_labels(self, dists, k=1):
@@ -153,7 +164,9 @@ class KNearestNeighbor(object):
       # neighbors. Store these labels in closest_y.                           #
       # Hint: Look up the function numpy.argsort.                             #
       #########################################################################
-      pass
+      idx = np.argsort(dists[i])
+      closet_y = self.y_train[idx[:k]]
+      
       #########################################################################
       # TODO:                                                                 #
       # Now that you have found the labels of the k nearest neighbors, you    #
@@ -161,7 +174,15 @@ class KNearestNeighbor(object):
       # Store this label in y_pred[i]. Break ties by choosing the smaller     #
       # label.                                                                #
       #########################################################################
-      pass
+      # print closet_y.shape
+      # Here, 'closet_y = closet_y.flatten()' is necessary. Because closet_y obtained is a 2-D
+      # array(see the output of closet_y.shape). Then it occurs an error that
+      # 'ValueError: object too deep for desired array'
+      # For detail, see http://stackoverflow.com/questions/15923081/valueerror-object-too-deep-for-desired-array-while-using-convolution
+      closet_y = closet_y.flatten()
+      counts = np.bincount(closet_y)
+      y_pred[i] = np.argmax(counts)
+
       #########################################################################
       #                           END OF YOUR CODE                            # 
       #########################################################################
