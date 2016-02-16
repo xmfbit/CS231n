@@ -19,7 +19,7 @@ def svm_loss_naive(W, X, y, reg):
   - loss as single float
   - gradient with respect to weights W; an array of same shape as W
   """
-  dW = np.zeros(W.shape) # initialize the gradient as zero
+  dW = np.zeros(W.shape, dtype = 'float64') # initialize the gradient as zero
 
   # compute the loss and the gradient
   num_classes = W.shape[1]
@@ -65,19 +65,29 @@ def svm_loss_vectorized(W, X, y, reg):
   Inputs and outputs are the same as svm_loss_naive.
   """
   loss = 0.0
-  dW = np.zeros(W.shape) # initialize the gradient as zero
-
+  dW = np.zeros(W.shape, dtype = 'float64') # initialize the gradient as zero
+  # print dW.shape
   #############################################################################
   # TODO:                                                                     #
   # Implement a vectorized version of the structured SVM loss, storing the    #
   # result in loss.                                                           #
   #############################################################################
-  pass
+  num_train = X.shape[0]
+  scores = X.dot(W)
+  correct_class_scores = scores[range(0, num_train), y].reshape(num_train, -1)
+  #print scores.shape
+  #print correct_class_scores.shape  
+  margin = scores - correct_class_scores + 1   # the margin is 1
+  margin[range(0, num_train), y] = 0    # when j = yi, continue
+  margin = np.maximum(np.zeros(margin.shape), margin)  
+  
+  loss = np.sum(margin) / num_train 
+  loss += 0.5 * reg * np.sum(W * W)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
 
-
+  
   #############################################################################
   # TODO:                                                                     #
   # Implement a vectorized version of the gradient for the structured SVM     #
@@ -87,7 +97,16 @@ def svm_loss_vectorized(W, X, y, reg):
   # to reuse some of the intermediate values that you used to compute the     #
   # loss.                                                                     #
   #############################################################################
-  pass
+  num_loss = (margin > 0).sum(1)   # the number of (L > 0) for each train sample
+  margin[margin > 0] = 1;
+  margin[range(0, num_train), y] = -num_loss;
+  dW = X.T.dot(margin) / num_train + reg*W;
+  #############################################################################
+  # 
+  # X' = [X_1' X_2' ... X_N'] 
+  # margin contains the weights that each X_i contributes to the final gradient
+  # try to understand the vectorization using the thought of "Partitioned Matrix"
+  
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
