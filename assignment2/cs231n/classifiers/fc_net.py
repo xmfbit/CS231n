@@ -293,7 +293,7 @@ class FullyConnectedNet(object):
     ############################################################################
     loss, dout = softmax_loss(scores, y)
     for i in xrange(1, self.num_layers + 1):
-      loss += 0.5 * self.reg * np.sum(self.params['W%d' %i])
+      loss += 0.5 * self.reg * np.sum(self.params['W%d' %i]*self.params['W%d' %i])
     dout, dW, db = affine_backward(dout, cache[-1])
     grads['W%d' %self.num_layers] = dW + self.reg * self.params['W%d' %self.num_layers]
     grads['b%d' %self.num_layers] = db
@@ -302,8 +302,6 @@ class FullyConnectedNet(object):
       dout, dW, db = affine_relu_backward(dout, cache[i-1])
       grads['W%d' %i] = dW + self.reg * self.params['W%d' %i]
       grads['b%d' %i] = db
-      #print grads['W%d'%i]
-      #print '-------------------------------'
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
