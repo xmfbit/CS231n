@@ -4,6 +4,40 @@ from cs231n.layers import *
 from cs231n.layer_utils import *
 
 
+def affine_bn_relu_forward(x, w, b, gamma, beta, bn_param):
+  """
+  Convenience layer that perorms an affine transform followed by a batch normalization and ReLU
+
+  Inputs:
+  - x: Input to the affine layer
+  - w, b: Weights for the affine layer
+  - gamma, beta, bn_param: parameters for the batch normalization layer
+  Returns a tuple of:
+  - out: Output from the ReLU
+  - cache: Object to give to the backward pass
+  """
+  # (out, cache) of the affine_forward: a = w*x+b
+  a, fc_cache = affine_forward(x, w, b)
+  # (out, cache) of the batch_normalization: y = gamma*x_hat+beta 
+  y, bn_cache = batchnorm_forward(a, gamma, beta, bn_param)
+  # (out, cache) of the Relu: out = max(0, y)
+  out, relu_cache = relu_forward(y)
+  cache = (fc_cache, bn_cache, relu_cache)
+  return out, cache
+  
+def affine_bn_relu_backward(dout, cache):
+  """
+  Backward pass for the affine-batch_normalization-relu convenience layer
+  """
+  fc_cache, bn_cache, relu_cache = cache
+  # Relu(a) = out
+  da = relu_backward(dout, relu_cache)
+  # BN(x, gamma, beta) = y
+  dy, dgamma, dbeta = batchnorm_backward(da, bn_cache)
+  # f(x, w, b) = y
+  dx, dw, db = affine_backward(dy, fc_cache)
+  return dx, dw, db, dgamma, dbeta
+  
 class TwoLayerNet(object):
   """
   A two-layer fully-connected neural network with ReLU nonlinearity and
