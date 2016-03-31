@@ -213,22 +213,28 @@ class FullyConnectedNet(object):
     # beta2, etc. Scale parameters should be initialized to one and shift      #
     # parameters should be initialized to zero.                                #
     ############################################################################
-    keys_W = ['W%d' %(x+1) for x in xrange(self.num_layers)]
-    keys_b = ['b%d' %(x+1) for x in xrange(self.num_layers)]
     
-    for key in xrange(1, self.num_layers+1):
-      if key == self.num_layers:
-        self.params[keys_b[key-1]] = np.zeros(num_classes)
-      else:
-        self.params[keys_b[key-1]] = np.zeros(hidden_dims[key-1])
-      if key == 1:
-        self.params[keys_W[0]] = np.random.randn(input_dim, hidden_dims[0]) * weight_scale
-      elif key == self.num_layers:
-        self.params[keys_W[-1]] = np.random.randn(hidden_dims[-1], num_classes) * weight_scale
-      else:
-        self.params[keys_W[key-1]] = np.random.randn(hidden_dims[key-2], hidden_dims[key-1]) * weight_scale
-#    for i in xrange(self.num_layers):
-#      print i, self.params['W%d' %(i+1)].shape
+    # connect the input layer to the first hidden layer 
+ 
+    self.params['W1'] = np.random.randn(input_dim, hidden_dims[0]) * weight_scale
+    self.params['b1'] = np.zeros(hidden_dims[0], dtype = dtype)
+
+    # connect the last hidden layer to the output layer    
+    self.params['W%d' %self.num_layers] = np.random.randn(hidden_dims[-1], num_classes) * weight_scale
+    self.params['b%d' %self.num_layers] = np.zeros(num_classes, dtype = dtype)
+    
+    ## connect (key-1)th hidden layer to the (key)th hidden layer
+    for key in xrange(2, self.num_layers):
+      in_dim = hidden_dims[(key - 1) - 1]  # the index starts from 0
+      out_dim = hidden_dims[key - 1]
+      self.params['W%d' %key] = np.random.randn(in_dim, out_dim) * weight_scale
+      self.params['b%d' %key] = np.zeros(out_dim, dtype = dtype)
+    
+    if self.use_batchnorm:
+      # affine_bn_relu
+      for key in xrange(1, self.num_layers):  # the output layer doesn't have BN layer
+        self.params['gamma%d' %key] = np.ones(hidden_dims[key-1], dtype = dtype)
+        self.params['beta%d' %key] = np.zeros(hidden_dims[key-1], dtype = dtype)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -286,23 +292,26 @@ class FullyConnectedNet(object):
     # self.bn_params[1] to the forward pass for the second batch normalization #
     # layer, etc.                                                              #
     ############################################################################
-        
-    out = []
-    cache = []  
-    for i in xrange(1, self.num_layers+1):
-      if i == 1:   # the first layer
-        layer_out, layer_cache = affine_relu_forward(X, self.params['W1'], self.params['b1'])
-      elif i == self.num_layers:  # the last layer
-        layer_out, layer_cache = affine_forward(out[-1], self.params['W%d' %self.num_layers],\
-        self.params['b%d' %self.num_layers])
-      else:
-        layer_out, layer_cache = affine_relu_forward(out[i-2], self.params['W%d' %i],\
-        self.params['b%d' %i])
-      out.append(layer_out)
-      cache.append(layer_cache)
-    scores = out[-1]
-    ## out[i] is the ith layer's output , i = [0...self.num_layer)
-    ## cache[i] is the cache of ith layer
+    if not self.use_batchnorm:
+      cache = []
+      out, cache_1 = affine_relu_forward(X, self.params['W1'], self.params['b1'])
+      cache.append(cache_1)    
+      for i in xrange(2, self.num_layers):
+          out, cache_1 = affine_relu_forward(out, self.params['W%d' %i], self.params['b%d' %i]);
+          cache.append(cache_1)
+      scores, cache_1 = affine_forward(out, self.params['W%d' %self.num_layers], self.params['b%d' %self.num_layers])    
+      cache.append(cache_1)
+    else:
+      cache = []
+      out, cache_1 = affine_bn_relu_forward(X, self.params['W1'], self.params['b1'], \
+      self.params['gamma1'], self.params['beta1'], self.bn_params[0])
+      cache.append(cache_1)
+      for i in xrange(2, self.num_layers):
+        out, cache_1 = affine_bn_relu_forward(out, self.params['W%d' %i], self.params['b%d' %i], \
+        self.params['gamma%d' %i], self.params['beta%d' %i], self.bn_params[i-1])
+        cache.append(cache_1)
+      scores, cache_1 = affine_forward(out, self.params['W%d' %self.num_layers], self.params['b%d' %self.num_layers])
+      cache.append(cache_1)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -328,14 +337,24 @@ class FullyConnectedNet(object):
     loss, dout = softmax_loss(scores, y)
     for i in xrange(1, self.num_layers + 1):
       loss += 0.5 * self.reg * np.sum(self.params['W%d' %i]*self.params['W%d' %i])
+    # the output layer    
     dout, dW, db = affine_backward(dout, cache[-1])
     grads['W%d' %self.num_layers] = dW + self.reg * self.params['W%d' %self.num_layers]
     grads['b%d' %self.num_layers] = db
     
-    for i in xrange(self.num_layers-1, 0, -1):
-      dout, dW, db = affine_relu_backward(dout, cache[i-1])
-      grads['W%d' %i] = dW + self.reg * self.params['W%d' %i]
-      grads['b%d' %i] = db
+    # other layer
+    if not self.use_batchnorm:
+      for i in xrange(self.num_layers-1, 0, -1):
+        dout, dW, db = affine_relu_backward(dout, cache[i-1])
+        grads['W%d' %i] = dW + self.reg * self.params['W%d' %i]
+        grads['b%d' %i] = db
+    else:
+      for i in xrange(self.num_layers-1, 0, -1):
+        dout, dW, db, dgamma, dbeta = affine_bn_relu_backward(dout, cache[i-1])
+        grads['W%d' %i] = dW + self.reg * self.params['W%d' %i]
+        grads['b%d' %i] = db
+        grads['gamma%d' %i] = dgamma
+        grads['beta%d' %i] = dbeta
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
