@@ -268,15 +268,7 @@ def batchnorm_backward_alt(dout, cache):
   # should be able to compute gradients with respect to the inputs in a       #
   # single statement; our implementation fits on a single 80-character line.  #
   #############################################################################
-  ## TODO: need change  
-  gamma, mu, var, eps, x_hat, x = cache
-  dx_hat = dout * gamma
-  dgamma = np.sum(dout*x_hat, axis = 0)
-  dbeta = np.sum(dout, axis = 0)
-  
-  m = x.shape[0]
-  #d_var = 
-  #dx = dx_hat/np.sqrt(var+eps) - 1./m*np.sum(dx_hat/np.sqrt(var+eps)) +   
+  pass 
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -315,7 +307,8 @@ def dropout_forward(x, dropout_param):
     # TODO: Implement the training phase forward pass for inverted dropout.   #
     # Store the dropout mask in the mask variable.                            #
     ###########################################################################
-    pass
+    mask = np.random.rand(*x.shape) < p
+    out = x * mask / p
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
@@ -323,7 +316,8 @@ def dropout_forward(x, dropout_param):
     ###########################################################################
     # TODO: Implement the test phase forward pass for inverted dropout.       #
     ###########################################################################
-    pass
+    # When using inverted dropout, just let output equals with the input
+    out = x
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
@@ -350,7 +344,8 @@ def dropout_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the training phase backward pass for inverted dropout.  #
     ###########################################################################
-    pass
+    p = dropout_param['p']
+    dx = dout * mask / p
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
@@ -358,6 +353,17 @@ def dropout_backward(dout, cache):
     dx = dout
   return dx
 
+
+def conv_simple_naive(x, w, b):
+  """
+  A naive method to calculate the convolution of x and w, b
+  Input:
+  - x: Input data after padding of shape (C, HH, WW)
+  - w: Filter weights of shape (C, HH, WW)
+  - b: Biase, a scalar
+  Returns the result of conv(x, w, b)
+  """
+  return np.sum(x * w) + b
 
 def conv_forward_naive(x, w, b, conv_param):
   """
@@ -387,10 +393,52 @@ def conv_forward_naive(x, w, b, conv_param):
   # TODO: Implement the convolutional forward pass.                           #
   # Hint: you can use the function np.pad for padding.                        #
   #############################################################################
-  pass
+  """  
+  # This is implemented by me.
+  # some parameters we can easily get or calculate  
+  stride = conv_param['stride']
+  pad = conv_param['pad']
+  (N, C, H, W) = x.shape
+  (F, CC, HH, WW) = w.shape
+  assert C == CC
+  H_ = 1 + (H + 2 * pad - HH) / stride
+  W_ = 1 + (W + 2 * pad - WW) / stride
+  out_dim = (N, F, H_, W_)
+  out = np.zeros(out_dim, dtype = x.dtype)
+  # padding the input
+  x_pad = np.lib.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)), \
+  'constant', constant_values = 0)
+  # [delta_H, HH-delta_H + center_y) is the desired x which
+  # will convolute with the weight
+  delta_H = (HH - 1) / 2   
+  delta_W = (WW - 1) / 2
+  # for each input data
+  for n in xrange(N):
+    x_1 = x_pad[n, :, :, :]
+    # for each filter    
+    for f in xrange(F):
+      f_1 = w[f, :, :, :]
+      for i in xrange(0, H_):
+        for j in xrange(0, W_):
+          # the center position of current x data          
+          # the position should be shifted to get the true position
+          # after padding          
+          center = (i * stride + pad, j * stride + pad)
+          x_conv = x_1[:, \
+          center[0] - delta_H : HH - delta_H + center[0], 
+          center[1] - delta_W : WW - delta_W + center[1]]
+          out[n, f, i, j] = conv_simple_naive(x_conv, f_1, b[f])
+  """  
+  """
+  This implementation is introduced in the slide.
+  More memory, but more efficient.
+  """
+  
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
+  # Add an assertion  
+  assert out_dim == out.shape
   cache = (x, w, b, conv_param)
   return out, cache
 
