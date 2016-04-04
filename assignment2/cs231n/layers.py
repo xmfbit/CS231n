@@ -393,9 +393,7 @@ def conv_forward_naive(x, w, b, conv_param):
   # TODO: Implement the convolutional forward pass.                           #
   # Hint: you can use the function np.pad for padding.                        #
   #############################################################################
-  """  
-  # This is implemented by me.
-  # some parameters we can easily get or calculate  
+
   stride = conv_param['stride']
   pad = conv_param['pad']
   (N, C, H, W) = x.shape
@@ -412,6 +410,9 @@ def conv_forward_naive(x, w, b, conv_param):
   # will convolute with the weight
   delta_H = (HH - 1) / 2   
   delta_W = (WW - 1) / 2
+  """
+  # This is implemented by myself.
+  # some parameters we can easily get or calculate  
   # for each input data
   for n in xrange(N):
     x_1 = x_pad[n, :, :, :]
@@ -433,7 +434,20 @@ def conv_forward_naive(x, w, b, conv_param):
   This implementation is introduced in the slide.
   More memory, but more efficient.
   """
-  
+  x_conv = np.zeros((HH * WW * C, H_ * W_))
+  # for each input image
+  for n in xrange(N):
+    cnt_win = 0   # the number of windows that have done convolution
+    for i in xrange(H_):
+      for j in xrange(W_):
+        center = (i * stride + pad, j * stride + pad)
+        x_conv[:, cnt_win] = x_pad[n, :, \
+        center[0] - delta_H: HH - delta_H + center[0], \
+        center[1] - delta_W: WW - delta_W + center[1]].\
+        reshape((-1, 1)).squeeze()
+        cnt_win += 1
+    res_conv = np.dot(w.reshape(F, -1), x_conv) + b.reshape(F, -1)  
+    out[n, :, :, :] = res_conv.reshape((F, H_, W_)) 
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -441,7 +455,6 @@ def conv_forward_naive(x, w, b, conv_param):
   assert out_dim == out.shape
   cache = (x, w, b, conv_param)
   return out, cache
-
 
 def conv_backward_naive(dout, cache):
   """
@@ -460,7 +473,74 @@ def conv_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the convolutional backward pass.                          #
   #############################################################################
-  pass
+  (x, w, b, conv_param) = cache
+  stride = conv_param['stride']
+  pad = conv_param['pad']
+  (N, C, H, W) = x.shape
+  (F, CC, HH, WW) = w.shape
+  assert C == CC
+  H_ = 1 + (H + 2 * pad - HH) / stride
+  W_ = 1 + (W + 2 * pad - WW) / stride
+  out_dim = (N, F, H_, W_)
+  assert out_dim == dout.shape
+  delta_H = (HH - 1) / 2   
+  delta_W = (WW - 1) / 2
+  center_in_template = (delta_H, delta_W)
+  # calculate dx
+  dx = np.zeros(x.shape)
+  for n in xrange(N):
+    for c in xrange(C):
+      for im_h in xrange(H):
+        for im_w in xrange(W):
+          # print 'im_h = ', im_h, ' im_w = ', im_w
+          dx_1 = 0.0
+          # get the templates centers which involves         
+          centers = []
+          for yy in xrange(im_h - delta_H, im_h - delta_H + HH):
+            if yy < 0 or yy >= H:
+              continue
+            for xx in xrange(im_w - delta_W, im_w - delta_W + WW):
+              if xx >= 0 and xx < W:
+                centers.append((yy, xx))
+          
+          for center in centers:
+              #print 'center = ', cen
+              ii = center[0] / stride
+              jj = center[1] / stride
+              #print 'ii = ', ii, ' jj = ', jj
+              for f in xrange(F):
+                # assert ii < H_ and ii >= 0
+                # assert jj < W_ and jj >= 0
+                row_in_template = center_in_template[0] - (center[0] - im_h)
+                col_in_template = center_in_template[1] - (center[1] - im_w)
+                #print 'i = ', i, ' j = ', j
+                dx_1 += dout[n, f, ii, jj] * w[f, c, row_in_template, col_in_template]
+            
+          dx[n, c, im_h, im_w] = dx_1
+  
+  # calculate dw
+  dw = np.zeros(w.shape)
+  for f in xrange(F):
+    for c in xrange(C):
+      for t_h in xrange(HH):
+        for t_w in xrange(WW):
+          print 't_h = ', t_h, ' t_w = ', t_w
+          dw_1 = 0.0
+          diff = (t_h - center_in_template[0], t_w - center_in_template[1])
+          print 'diff = ', diff          
+          # slide the template in the image
+          for i in xrange(H_):
+            for j in xrange(W_):
+              center = (i * stride, j * stride)
+              print 'center = ', center
+              x_position = (center[0] + diff[0], center[1] + diff[1])
+              print 'x_position = ', x_position              
+              if x_position[0] >= 0 and x_position[0] < H \
+              and x_position[1] >= 0 and x_position[1] < W:
+                print 'Satisfy!'                
+                for n in xrange(N):
+                  dw_1 += dout[n, f, i, j] * x[n, c, x_position[0], x_position[1]]
+        dw[f, c, t_h, t_w] = dw_1
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
