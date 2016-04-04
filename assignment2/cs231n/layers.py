@@ -524,23 +524,21 @@ def conv_backward_naive(dout, cache):
     for c in xrange(C):
       for t_h in xrange(HH):
         for t_w in xrange(WW):
-          print 't_h = ', t_h, ' t_w = ', t_w
           dw_1 = 0.0
           diff = (t_h - center_in_template[0], t_w - center_in_template[1])
-          print 'diff = ', diff          
           # slide the template in the image
           for i in xrange(H_):
             for j in xrange(W_):
               center = (i * stride, j * stride)
-              print 'center = ', center
               x_position = (center[0] + diff[0], center[1] + diff[1])
-              print 'x_position = ', x_position              
               if x_position[0] >= 0 and x_position[0] < H \
               and x_position[1] >= 0 and x_position[1] < W:
-                print 'Satisfy!'                
                 for n in xrange(N):
                   dw_1 += dout[n, f, i, j] * x[n, c, x_position[0], x_position[1]]
-        dw[f, c, t_h, t_w] = dw_1
+          dw[f, c, t_h, t_w] = dw_1
+  
+  # calculate db
+  db = np.ones(F)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
