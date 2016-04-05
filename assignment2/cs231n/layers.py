@@ -538,7 +538,7 @@ def conv_backward_naive(dout, cache):
           dw[f, c, t_h, t_w] = dw_1
   
   # calculate db
-  db = np.ones(F)
+  db = np.sum(np.sum(np.sum(dout, axis = 0), axis = 1), axis = 1)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
