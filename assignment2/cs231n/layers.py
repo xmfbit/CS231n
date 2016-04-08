@@ -564,11 +564,32 @@ def max_pool_forward_naive(x, pool_param):
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  pass
+  ph = pool_param['pool_height']
+  pw = pool_param['pool_width']
+  stride = pool_param['stride']  
+  
+  N, C, H, W = x.shape
+  H_, W_ = (H - ph) / stride + 1, (W - pw) / stride + 1  
+  out = np.zeros((N, C, H_, W_), dtype = x.dtype)
+  max_idx = np.zeros((N, C, H_, W_, 2))
+  
+  for n in xrange(N):
+    for c in xrange(C):
+      for ih in xrange(H_):
+        tl_y = stride * ih
+        for iw in xrange(W_):
+          tl_x = stride * iw
+          data = x[n, c, tl_y: tl_y + stride, tl_x : tl_x + stride]
+          # we can record the position of the maximum element for backward
+          max_cnt = np.argmax(data)
+          max_pos = max_cnt / pw + tl_y, max_cnt % pw + tl_x
+          max_idx[n, c, ih, iw, 0], max_idx[n, c, ih, iw, 1] = max_pos[0], max_pos[1]
+          out[n, c, ih, iw] = x[n, c, max_pos[0], max_pos[1]]
+                    
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
-  cache = (x, pool_param)
+  cache = (x.shape, max_idx)
   return out, cache
 
 
@@ -587,7 +608,17 @@ def max_pool_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
-  pass
+  x_shape, max_idx = cache
+ 
+  N, C, H_, W_, _ = max_idx.shape
+  
+  dx = np.zeros(x_shape)
+  for n in xrange(N):
+    for c in xrange(C):
+      for fh in xrange(H_):
+        for fw in xrange(W_):
+          row, col = max_idx[n, c, fh, fw, 0], max_idx[n, c, fh, fw, 1]
+          dx[n, c, row, col] = dout[n, c, fh, fw]
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
