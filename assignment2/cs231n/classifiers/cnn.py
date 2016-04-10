@@ -4,7 +4,24 @@ from cs231n.layers import *
 from cs231n.fast_layers import *
 from cs231n.layer_utils import *
 
+def get_conv_relu_maxpool_outdim(input_dim, conv_param, pool_param, filter_size):
+  (C, H, W) = input_dim
+  stride = conv_param['stride']
+  pad = conv_param['pad']
+  (F, SF) = filter_size
+  
+  H = 1 + (H + 2 * pad - SF) / stride
+  W = 1 + (W + 2 * pad - SF) / stride
+  
+  #out_dim = (N, F, H, W)
+  
+  stride = pool_param['stride']
+  pw, ph = pool_param['pool_width'], pool_param['pool_height']
+  
+  H_, W_ = (H - ph) / stride + 1, (W - pw) / stride + 1
+  return (F, H_, W_)  
 
+ 
 class ThreeLayerConvNet(object):
   """
   A three-layer convolutional network with the following architecture:
@@ -47,22 +64,25 @@ class ThreeLayerConvNet(object):
     # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
     # of the output affine layer.                                              #
     ############################################################################
-    C, H, W = input_dim.shape
+    C, H, W = input_dim
     
     # store the weight and biase for the conv layer
     self.params['W1'] = np.random.randn(num_filters, C, filter_size, filter_size) * weight_scale
-    self.params['b1'] = np.zeros(num_filters)
+    self.params['b1'] = np.zeros(num_filters, dtype = dtype)
     
-    # store the weight and biase for affine layer
-    stride, pad = 1, (filter_size - 1) / 2
-    H_, W_ = 1 + (H + 2 * pad - filter_size) / stride, 1 + (W + 2 * pad - filter_size) / stride
+    # store the weight and biase for the hidden layer
+    conv_param = {'stride': 1, 'pad': (filter_size - 1) / 2}
+    pool_param = {'pool_height': 2, 'pool_width': 2, 'stride': 2}
     
-    stride = 2
-    pool_width, pool_height = 2, 2
-    out_put_dim = (N, C, (H_ - pool_height) / stride + 1, (W_ - pool_width) / stride + 1)    
+    conv_out_dim = get_conv_relu_maxpool_outdim((C, H, W), conv_param, pool_param, (num_filters, filter_size))
+    num = conv_out_dim[0] * conv_out_dim[1] * conv_out_dim[2]   
+    self.params['W2'] = np.random.randn(num, hidden_dim) * weight_scale
+    self.params['b2'] = np.zeros(hidden_dim, dtype = dtype)
     
-    #self.params['W2'] = np.random.randn(out_put_dim[0], out_put_dim[1], out_put_dim[2], out_put_dim[3])
-    #self.params['b2'] = np.zeros()
+    # store the weight and biase for the output layer
+
+    self.params['W3'] = np.random.randn(hidden_dim, num_classes) * weight_scale
+    self.params['b3'] = np.zeros(num_classes, dtype = dtype)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -94,7 +114,9 @@ class ThreeLayerConvNet(object):
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
-    pass
+    out_conv, cache_conv = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
+    out_hidden, cache_hidden = affine_relu_forward(out_conv, W2, b2)
+    scores, cache_scores = affine_forward(out_hidden, W3, b3)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -109,7 +131,22 @@ class ThreeLayerConvNet(object):
     # data loss using softmax, and make sure that grads[k] holds the gradients #
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
-    pass
+    loss, dout = softmax_loss(scores, y)
+    loss += 0.5 * self.reg * (np.sum(W1 * W1) + np.sum(W2 * W2) + np.sum(W3 * W3))
+    # for W3, b3
+    dout, dW, db = affine_backward(dout, cache_scores)
+    grads['W3'] = dW + self.reg * W3
+    grads['b3'] = db
+    
+    # for W2, b2
+    dout, dW, db = affine_relu_backward(dout, cache_hidden)
+    grads['W2'] = dW + self.reg * W2
+    grads['b2'] = db
+    
+    # for W1, b1
+    _, dW, db = conv_relu_pool_backward(dout, cache_conv)
+    grads['W1'] = dW + self.reg * W1
+    grads['b1'] = db
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
