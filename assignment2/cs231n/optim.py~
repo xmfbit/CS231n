@@ -148,9 +148,6 @@ def adam(x, dx, config=None):
   beta2 = config['beta2']
   epsilon = config['epsilon']
   """
-  # this is my implementation. it's wrong!
-  # this right implementation refered to 
-  # https://github.com/cthorey/CS231/blob/master/assignment2/cs231n/optim.py
   config['m'] = config['beta1'] * config['m'] + (1-config['beta1']) * dx
   config['v'] = config['beta2'] * config['v'] + (1-config['beta2']) * (dx**2)
   next_x = x - config['learning_rate'] * config['m'] / (np.sqrt(config['v']) + config['epsilon'])

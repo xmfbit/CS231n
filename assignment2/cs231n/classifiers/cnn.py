@@ -115,7 +115,8 @@ class ThreeLayerConvNet(object):
     # variable.                                                                #
     ############################################################################
     out_conv, cache_conv = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
-    out_hidden, cache_hidden = affine_relu_forward(out_conv, W2, b2)
+    conv_shape = out_conv.shape
+    out_hidden, cache_hidden = affine_relu_forward(out_conv.reshape(conv_shape[0], -1), W2, b2)
     scores, cache_scores = affine_forward(out_hidden, W3, b3)
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -132,7 +133,7 @@ class ThreeLayerConvNet(object):
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
     loss, dout = softmax_loss(scores, y)
-    loss += 0.5 * self.reg * (np.sum(W1 * W1) + np.sum(W2 * W2) + np.sum(W3 * W3))
+    loss += 0.5 * self.reg * (np.sum(W1 ** 2) + np.sum(W2 ** 2) + np.sum(W3 ** 2))
     # for W3, b3
     dout, dW, db = affine_backward(dout, cache_scores)
     grads['W3'] = dW + self.reg * W3
@@ -144,7 +145,7 @@ class ThreeLayerConvNet(object):
     grads['b2'] = db
     
     # for W1, b1
-    _, dW, db = conv_relu_pool_backward(dout, cache_conv)
+    _, dW, db = conv_relu_pool_backward(dout.reshape(conv_shape), cache_conv)
     grads['W1'] = dW + self.reg * W1
     grads['b1'] = db
     ############################################################################
