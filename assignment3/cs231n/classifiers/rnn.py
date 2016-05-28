@@ -135,7 +135,24 @@ class CaptioningRNN(object):
     # defined above to store loss and gradients; grads[k] should give the      #
     # gradients for self.params[k].                                            #
     ############################################################################
-    pass
+    cell_type = self.cell_type    
+    hidden_state, hidden_state_cache = affine_forward(features, W_proj, b_proj)
+    word_vector_out, word_vector_cache = word_embedding_forward(captions_in, W_embed)
+    if cell_type == 'rnn':
+      rnn_out, rnn_cache = rnn_forward(word_vector_out, hidden_state, Wx, Wh, b)
+      affine_out, affine_cache = temporal_affine_forward(rnn_out, W_vocab, b_vocab)
+      loss, dx = temporal_softmax_loss(affine_out, captions_out, mask)
+      dx, dW_vocab, db_vocab = temporal_affine_backward(dx, affine_cache)
+      dx, dh0, dWx, dWh, db = rnn_backward(dx, rnn_cache)
+      dW_embed = word_embedding_backward(dx, word_vector_cache)
+      dfeature, dW_proj, db_proj = affine_backward(dh0, hidden_state_cache)
+      
+      grads["W_proj"], grads["b_proj"] = dW_proj, db_proj
+      grads["W_embed"] = dW_embed
+      grads["Wx"], grads["Wh"], grads["b"] = dWx, dWh, db
+      grads["W_vocab"], grads["b_vocab"] = dW_vocab, db_vocab
+    else:
+      raise ValueError('Not Implement cell_type "%s"' % cell_type)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
