@@ -138,6 +138,7 @@ class CaptioningRNN(object):
     cell_type = self.cell_type    
     hidden_state, hidden_state_cache = affine_forward(features, W_proj, b_proj)
     word_vector_out, word_vector_cache = word_embedding_forward(captions_in, W_embed)
+   
     if cell_type == 'rnn':
       rnn_out, rnn_cache = rnn_forward(word_vector_out, hidden_state, Wx, Wh, b)
       affine_out, affine_cache = temporal_affine_forward(rnn_out, W_vocab, b_vocab)
@@ -147,12 +148,20 @@ class CaptioningRNN(object):
       dW_embed = word_embedding_backward(dx, word_vector_cache)
       dfeature, dW_proj, db_proj = affine_backward(dh0, hidden_state_cache)
       
-      grads["W_proj"], grads["b_proj"] = dW_proj, db_proj
-      grads["W_embed"] = dW_embed
-      grads["Wx"], grads["Wh"], grads["b"] = dWx, dWh, db
-      grads["W_vocab"], grads["b_vocab"] = dW_vocab, db_vocab
     else:
-      raise ValueError('Not Implement cell_type "%s"' % cell_type)
+      lstm_out, lstm_cache = lstm_forward(word_vector_out, hidden_state, Wx, Wh, b)
+      affine_out, affine_cache = temporal_affine_forward(lstm_out, W_vocab, b_vocab)
+      loss, dx = temporal_softmax_loss(affine_out, captions_out, mask)
+      dx, dW_vocab, db_vocab = temporal_affine_backward(dx, affine_cache)
+      dx, dh0, dWx, dWh, db = lstm_backward(dx, lstm_cache)
+      dW_embed = word_embedding_backward(dx, word_vector_cache)
+      dfeature, dW_proj, db_proj = affine_backward(dh0, hidden_state_cache)      
+
+    grads["W_proj"], grads["b_proj"] = dW_proj, db_proj
+    grads["W_embed"] = dW_embed
+    grads["Wx"], grads["Wh"], grads["b"] = dWx, dWh, db
+    grads["W_vocab"], grads["b_vocab"] = dW_vocab, db_vocab
+
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -219,13 +228,12 @@ class CaptioningRNN(object):
 
     word = np.ones((N, 1)) * self._start
     x = word_embedding_forward(word, W_embed)[0].squeeze()
-    h_state = affine_forward(features, W_proj, b_proj)[0]
-    h_state = rnn_step_forward(x, h_state, Wx, Wh, b)[0]
-
-    affine_out = affine_forward(h_state, W_vocab, b_vocab)[0]
-    max_idx = np.argmax(affine_out, axis = 1)    
-    
+ 
     if cell_type == "rnn":
+      h_state = affine_forward(features, W_proj, b_proj)[0]
+      h_state = rnn_step_forward(x, h_state, Wx, Wh, b)[0]
+      affine_out = affine_forward(h_state, W_vocab, b_vocab)[0]
+      max_idx = np.argmax(affine_out, axis = 1)   
       for i in xrange(T):
         captions[:, i] = max_idx
         if i < T-1:
@@ -234,8 +242,18 @@ class CaptioningRNN(object):
           affine_out = affine_forward(h_state, W_vocab, b_vocab)[0]
           max_idx = np.argmax(affine_out, axis = 1)
     else:
-      raise ValueError("lstm is not implemented yet")
-    
+      h_state = affine_forward(features, W_proj, b_proj)[0]
+      c_state = np.zeros(h_state.shape)
+      h_state, c_state, _ = lstm_step_forward(x, h_state, c_state, Wx, Wh, b)
+      affine_out = affine_forward(h_state, W_vocab, b_vocab)[0]
+      max_idx = np.argmax(affine_out, axis = 1)   
+      for i in xrange(T):
+        captions[:, i] = max_idx
+        if i < T-1:
+          x = word_embedding_forward(max_idx.reshape((max_idx.shape[0], 1)), W_embed)[0].squeeze()
+          h_state, c_state, _ = lstm_step_forward(x, h_state, c_state, Wx, Wh, b)
+          affine_out = affine_forward(h_state, W_vocab, b_vocab)[0]
+          max_idx = np.argmax(affine_out, axis = 1)      
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
