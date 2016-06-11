@@ -250,3 +250,33 @@ class PretrainedCNN(object):
     dX, grads = self.backward(dscores, cache)
     return loss, grads
 
+def compute_saliency_maps_(X, y, model):
+  """
+  Compute a class saliency map using the model for images X and labels y.
+  
+  Input:
+  - X: Input images, of shape (N, 3, H, W)
+  - y: Labels for X, of shape (N,)
+  - model: A PretrainedCNN that will be used to compute the saliency map.
+  
+  Returns:
+  - saliency: An array of shape (N, H, W) giving the saliency maps for the input
+    images.
+  """
+  saliency = None
+  ##############################################################################
+  # TODO: Implement this function. You should use the forward and backward     #
+  # methods of the PretrainedCNN class, and compute gradients with respect to  #
+  # the unnormalized class score of the ground-truth classes in y.             #
+  ##############################################################################
+  N, _, H, W = X.shape
+  scores, cache = model.forward(X, mode = "test")
+  dscores = np.zeros_like(scores)
+  dscores[xrange(N), y] = 1.0
+  dx, _ = model.backward(dscores, cache)
+  assert(dx.shape == X.shape)
+  saliency = np.sum(np.abs(dx), axis = 1)
+  ##############################################################################
+  #                             END OF YOUR CODE                               #
+  ##############################################################################
+  return saliency
